@@ -14,7 +14,7 @@ class MathError(RuntimeError):
     pass
 
 class ReLVLiNGAM():
-    def __init__(self, X, highest_l, verbose=False, only_lowest_order_equations=True, threshold_power=1/8, thresholds=[0.008, 0.8], scale_partly=True):
+    def __init__(self, X, highest_l, verbose=False, only_lowest_order_equations=True, threshold_power=1/8, thresholds=[0.008, 0.8], scale_partly=True, **kwargs):
         self.X = X
         self.n, self.p = X.shape[0], X.shape[1]
         self.highest_l = highest_l
@@ -66,11 +66,11 @@ class ReLVLiNGAM():
                 self.topological_order = self.topological_order + [np.nan for _ in range(len(remaining_nodes))]
                 self.fitted = True
                 return self.topological_order, self.B
-        
+
         self._process_last_node(remaining_nodes[0], cumulants)
         self.fitted = True
         return self.topological_order, self.B
-    
+
     def _estimate_cumulants(self, X):
         """Estimate all cumulants that are relevant for ReLVLiNGAM, i.e. all cumulants with up to two distinct indices."""
         # For efficiency reasons, first estimate all moments and then plug them into the cumulant formulas instead of estimating each cumulant separately.
@@ -89,7 +89,7 @@ class ReLVLiNGAM():
         for k in range(2, self.highest_order+1):
             moment_dict.update({symbols(f"m_{''.join(map(str, ind))}"): estimate_moment(np.array(ind), X) for ind in it.combinations_with_replacement(nodes, k) if len(set(ind)) <= 2})
         return moment_dict
-    
+
     def _process_last_node(self, last_node, cumulants):
         self.topological_order.append(last_node)
         self.B[:,last_node] = np.zeros(self.p)
@@ -110,7 +110,7 @@ class ReLVLiNGAM():
                 cumulant_dict.update({symbols(f"c_{''.join(map(str, ind))}"): cumulants[k][ind] for ind in it.combinations_with_replacement(nodes, k) if len(set(ind)) <= 2})
         return cumulant_dict
 
-        
+
     def _find_source(self, remaining_nodes, cumulants):
         """Find source among remaining nodes."""
         all_singular_values = self._calculate_all_singular_values(remaining_nodes, cumulants)
@@ -127,7 +127,7 @@ class ReLVLiNGAM():
         #         self.pairwise_confounders[remaining_nodes, source] = [self.highest_l if potential_source != source else 0 for potential_source in remaining_nodes]
         #         self.topological_order.append(source)
         #         return source
-        
+
         argminima = get_all_argminima(np.sum(confounders, axis=0))
         if len(argminima) == 1:
             argmin = argminima[0]
@@ -147,7 +147,7 @@ class ReLVLiNGAM():
         true_l = self.highest_l # int(min(confounders[other_node, potential_source], self.highest_l))
         sigmas = all_singular_values[f"{remaining_nodes[potential_source]}{remaining_nodes[other_node]}{true_l}"]
         return sigmas[true_l+1]/sigmas[0]
-    
+
     def _ratio_highest_l(self, potential_source, other_node, all_singular_values):
         sigmas = all_singular_values[f"{potential_source}{other_node}{self.highest_l}"]
         return sigmas[self.highest_l+1]/sigmas[0]
@@ -168,12 +168,12 @@ class ReLVLiNGAM():
                 sigmas[f"{potential_source}{other_node}{l}"] = sigma.tolist()
                 sigmas[f"{other_node}{potential_source}{l}"] = sigma_rev.tolist()
         return sigmas
-        
+
     def _estimate_num_confounders(self, potential_source, other_node, all_singular_values):
         """Estimate the number of confounders between two nodes."""
         iteration = len(self.topological_order)
         threshold = self.thresholds[0]/self.n**self.threshold_power if iteration == 0 else self.thresholds[1]*iteration/self.n**self.threshold_power
-            
+
         highest_l = min(self.upper_bounds_confounders[other_node, potential_source], self.highest_l)
         for l in range(highest_l+1):
             r = self.constraints[l]["r"]
@@ -181,7 +181,7 @@ class ReLVLiNGAM():
             if (sigma[r]/sigma[0] < threshold):
                 return l
         return self.upper_bounds_confounders[other_node, potential_source]
-        
+
     def _estimate_bs(self, source, remaining_nodes, cumulants):
         """Estimates the causal effects from the source and its latent parents on the remaining nodes."""
         cumulant_dict = self._form_symbol_to_cumulant_dict(cumulants, [source] + remaining_nodes, scale_partly=False)
@@ -189,14 +189,14 @@ class ReLVLiNGAM():
         highest_l = max([self.pairwise_confounders[other_node, source] for other_node in remaining_nodes])+1
         bs_unmatched = np.full((self.p, highest_l), np.nan)
         # len(remaining_nodes) x highest_l+1 x highest_order-1 omegas will be estimated.
-        marginal_omegas = np.full((self.p, self.highest_l+1, self.highest_order-1), np.nan) 
+        marginal_omegas = np.full((self.p, self.highest_l+1, self.highest_order-1), np.nan)
         bs_unmatched[source,:] = np.ones(highest_l)
         for other_node in remaining_nodes:
             l = self.pairwise_confounders[other_node, source]
             bs_unmatched[other_node,:(l+1)] = self._estimate_bij(source, other_node, cumulant_dict)
             if l > 0:
                 marginal_omegas[other_node,:(l+1),:] = self._estimate_marginal_omegas(source, other_node, bs_unmatched[other_node,:(l+1)], cumulant_dict)
-        
+
         # All edges remaining_nodes -> source are set to 0
         self.B[source, remaining_nodes] = np.zeros(len(remaining_nodes))
 
@@ -218,7 +218,7 @@ class ReLVLiNGAM():
         else:
             self.B[source, source] = 1
             self.B[remaining_nodes, source] = bs_unmatched.reshape(-1)[remaining_nodes]
-        
+
     def _estimate_bij(self, j, i, cumulant_dict):
         """Estimate the coefficients for the causal effect from j on i. Returns a np.ndarray with the (l+1) options for b_ij."""
         l = self.pairwise_confounders[i, j]
@@ -231,7 +231,7 @@ class ReLVLiNGAM():
             eq = equations_bij[e]
             # Need type conversion for numpy root function to work
             estimated_coeffs = [float(coeff.subs(specify_nodes).subs(cumulant_dict)) for coeff in eq.all_coeffs()]
-            # A numpy polynomial has the opposite order of coefficients to sympy: Numpy starts with the lowest power, 
+            # A numpy polynomial has the opposite order of coefficients to sympy: Numpy starts with the lowest power,
             # Sympy with the highest. Therefore, reverse the coefficients.
             roots = np.polynomial.Polynomial(estimated_coeffs[::-1]).roots()
             if len(roots) < l+1:
@@ -241,13 +241,13 @@ class ReLVLiNGAM():
             roots = np.sort(np.real(roots))
             all_roots[:,e] = roots
 
-        # Return the mean of the roots of all the theoretically equivalent equations  
+        # Return the mean of the roots of all the theoretically equivalent equations
         all_roots[np.isinf(all_roots)] = np.nan
         mean_roots = np.nanmean(all_roots, axis=1)
         if not np.all(np.isfinite(mean_roots)):
             raise MathError(f"Estimated b is NaN/Inf for source {j} and test node {i}, confs =1, all roots are {all_roots}.")
         return mean_roots
-             
+
     def _estimate_marginal_omegas(self, source, other_node, bs_unmatched, cumulant_dict):
         """Estimate the marginal omegas for a pair of nodes.
 
@@ -272,11 +272,11 @@ class ReLVLiNGAM():
             except np.linalg.LinAlgError:
                 raise MathError(f"Linear system for {k}th order omega for source {source} and test node {other_node} is singular.")
         return marginal_omegas
-    
+
     def _match_etas(self, remaining_nodes, source, marginal_omegas):
         """
         Match the latents in the marginal models to infer the latents in the overall graph.
-        
+
         Args:
             remaining_nodes (list): List of remaining nodes.
             source (int): The source.
@@ -295,7 +295,7 @@ class ReLVLiNGAM():
 
         # Group exogeneous sources of all confounded nodes
         for other_node in [other_node for other_node in remaining_nodes if self.pairwise_confounders[other_node, source] > 0]:
-            # Latents L -> other_node can only be matched with latents L -> w for w != other_node. 
+            # Latents L -> other_node can only be matched with latents L -> w for w != other_node.
             # Hence, store the number of groups found for earlier nodes.
             count_groups_found_so_far = len(descendants_new_latents)
             for latent_to_match in range(self.pairwise_confounders[other_node, source]+1):
@@ -303,7 +303,7 @@ class ReLVLiNGAM():
                 group_found = False
                 while not group_found and candidate < count_groups_found_so_far:
                     descendants = descendants_new_latents[candidate]
-                    old_latents = [matches_latents[(d, candidate)] for d in descendants]                          
+                    old_latents = [matches_latents[(d, candidate)] for d in descendants]
                     mean_omegas = np.mean([marginal_omegas[descendants, old_latents, :]], axis=0)
                     if other_node not in descendants and np.all(np.abs(np.nan_to_num(marginal_omegas[other_node, latent_to_match, :] - mean_omegas)) < threshold):
                         descendants_new_latents[candidate].append(other_node)
@@ -324,13 +324,13 @@ class ReLVLiNGAM():
 
         descendants_new_latents, matches_latents, matches_noise = self._disentangle_noise(descendants_new_latents, matches_latents, marginal_omegas, remaining_nodes)
         return descendants_new_latents, matches_latents, matches_noise
-    
+
     def _disentangle_noise(self, descendants_new_latents, matches_latents, marginal_omegas, remaining_nodes):
         """
         Find the eta_j corresponding to the noise epsilon_s. Epsilon_s should show up in the marginal model for each other node. However, its
         estimated cumulants in the marginal model generally differ whenever two nodes do not have precisely the same latent ancestors. Thus,
         for each set of nodes that have coinciding latent ancestors, there should be one eta_j that has precisely this set as its descendants.
-        If not, the latent with the largest error is split up again to satisfy this condition. 
+        If not, the latent with the largest error is split up again to satisfy this condition.
         """
         nodes_with_same_latents = self._identify_nodes_with_same_latents(descendants_new_latents, remaining_nodes)
         matches_noise = {}
@@ -361,7 +361,7 @@ class ReLVLiNGAM():
         for key, value in descendants_to_latents_dict.items():
             nodes_with_same_latents[tuple(value)].append(key)
         return nodes_with_same_latents
-    
+
     def _estimate_omegas_overall_model(self, source, parents_source, remaining_nodes, cumulants):
         """Estimate the omegas of exog(source) in the whole graph."""
         if len(parents_source) == 1:
@@ -389,18 +389,18 @@ class ReLVLiNGAM():
         for k in self.orders:
             cumulants[k] = cumulants[k] - self.omegas[source, k-2] * tensor_outer_product(self.B[:,source], k) \
                 - sum(self.omegas[l, k-2] * tensor_outer_product(self.B[:,l], k) for l in new_latents)
-            
+
         # Don't abort if negative variances are found, but store iteration of this anomaly
         if any(cumulants[2][remaining_nodes, remaining_nodes] < 0):
             # Continue without scaling. For schaling, I need to calculate the root of the variances.
             self.scale_partly = False
-    
+
         return cumulants
 
     # This gives all Bs compatible with distribution, not only the sparsest ones
     def get_all_possible_permutations(self):
         """
-        Return all possible path matrices compatible with the distribution. 
+        Return all possible path matrices compatible with the distribution.
         The function does not restrict to the path matrices corresponding to the sparsest graph.
         """
         all_possible_permutations = [list(range(self.B.shape[1]))]
@@ -414,7 +414,7 @@ class ReLVLiNGAM():
                 additional_permutation[oldest_child], additional_permutation[latent+self.p] = additional_permutation[latent+self.p], additional_permutation[oldest_child]
                 new_permutations.append(additional_permutation)
             all_possible_permutations += new_permutations
-        
+
         return all_possible_permutations
 
 def tensor_outer_product(v, k):
