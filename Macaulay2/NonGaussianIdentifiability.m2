@@ -1,0 +1,59 @@
+paramoment = (n, k, edges, idpar,hidnodes) -> (
+    list2 = flatten for i to n-1 list for j from i to n-1 list (i,j);
+    list3 = flatten flatten for i to n-1 list for j from i to n-1 list for k from j to n-1 list (i,j,k);
+    R = QQ[l_(0,0)..l_(n-1,n-1), apply(list2,i->s_i),apply(list3,i->t_i)];
+    L = mutableIdentity(R, n);
+    for e in edges do (
+	L_e = -l_e;
+	);
+    L = matrix(L);
+    L =  substitute(L, R);
+    use R;
+    S = matrix( apply(n, i -> apply(n, j -> if (i < j) then s_(i,j) else s_(j,i))));
+    W = (transpose L)*S*L;
+    equationList = flatten for i to n-1 list for j from i+1 to n-1 list W_(i,j);
+    for i from 0 to n-1 do (
+    	for j from 0 to n-1 do (
+    	    for k from 0 to n-1 do (
+		use R;
+		if(i == j and i == k) then continue;
+		eqn = sum(apply(n, a -> sum(apply(n, b -> sum(apply(n, c -> L_(a,i)*L_(b,j)*L_(c,k)*t_(toSequence sort{a,b,c})))))));		
+		equationList = append(equationList, eqn);
+		);
+    	    );
+	);
+   lpar=l_idpar;
+   I = ideal(equationList);
+   ll=delete(lpar,toList(l_(0,0)..l_(n-1,n-1)));
+
+   elist2 = flatten for i from 0 to  hidnodes list for j from i to (n-1) list (i,j);
+   elist3 = flatten flatten for i from 0 to hidnodes list for j from i to (n-1) list for k from j to (n-1) list (i,j,k);
+
+   ll = append(ll,apply(elist2,i->s_i));
+   ll = append(ll,apply(elist3,i->t_i));   
+  
+   ll = flatten ll;
+   for i from 0 to (#elist2-1) do  list2 = delete(elist2#i,list2);
+   for i from 0 to (#elist3-1) do  list3 = delete(elist3#i,list3);
+    
+
+   J = eliminate(ll, I);
+   R1=QQ[lpar, apply(list2,i->s_i),apply(list3,i->t_i),MonomialOrder=> Lex];
+   J=substitute(J,R1);
+   return(J);
+);
+
+
+-- DID graph
+
+ndid = 4;
+kdid = 3;
+edgesdid = {(0,1),(0,2),(0,3),(1,2),(2,3)};
+idpardid = (2,3);
+hidnodesdid = 0;
+
+Idid = paramoment(ndid,kdid,edgesdid,idpardid,hidnodesdid);
+
+Gensdid = gens gb Idid;
+
+gendid = Gensdid_(0,109)
