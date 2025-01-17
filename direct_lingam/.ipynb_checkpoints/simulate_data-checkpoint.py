@@ -11,9 +11,9 @@ all_settings = {
     "a": {'Lambda': np.tril(np.ones((2, 2)), k=-1), 'Gamma': np.ones((2, 1)), 'highest_l': 1},
     "b": {'Lambda': get_Lambda([(1,0), (2, 1)], 3), 'Gamma': np.array([[0], [1], [1]]), 'highest_l': 1},
     "c": {'Lambda': get_Lambda([(1,0), (2,1)], 3), 'Gamma': np.array([[1, 0], [1, 1], [0, 1]]), 'highest_l': 1},
-    "d": {'Lambda': np.tril(np.ones((3, 3)), k=-1), 'Gamma': np.ones((3, 1)), 'highest_l': 1},
+    "d": {'Lambda': np.tril(np.ones((3, 3)), k=-1), 'Gamma': np.ones((3, 1)), 'highest_l': 1},    
     "e": {'Lambda': np.tril(np.ones((3, 3)), k=-1), 'Gamma':np.ones((3, 2)), 'highest_l': 2},
-    'f': {'Lambda': get_Lambda([(1,0), (2,0), (3,1), (4,1)], 5),
+    'f': {'Lambda': get_Lambda([(1,0), (2,0), (3,1), (4,1)], 5), 
           'Gamma': np.array([[1, 0], [1, 1], [0, 0], [1, 0], [0, 1]]), 'highest_l': 1}
 }
 
@@ -43,7 +43,7 @@ def simulate_data(n, noise_distribution, Lambda, Gamma, permute_order=True):
         permutation = np.random.permutation(p)
         adjacency = adjacency[permutation]
         adjacency[:, :p] = adjacency[:, permutation]
-
+    
     B = adjacency_to_path_matrix(adjacency)
     eta = sample_eta(n, q, noise_distribution)
     # Fortran array as required by moment estimation function
@@ -79,5 +79,5 @@ def sample_eta(n, q, noise_distribution):
         eta = np.array([np.random.exponential(beta, n) - beta for beta in betas])
     elif noise_distribution=="uniform":
         radiuses = np.random.uniform(1, 3, q)
-        eta = np.array([np.random.uniform(-radius, radius, n) for radius in radiuses])
+        eta = np.array([np.random.uniform(-radiuis, radius, n) for radius in radiuses])
     return np.transpose(eta)
