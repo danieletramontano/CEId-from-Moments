@@ -189,8 +189,9 @@ class CM(FixedGraphReLVLiNGAM):
         latent_array = [0] * self.highest_l + [1] * 3
         empty_array = [0] * (self.highest_l + 3)
         treatment_array = [0] * (self.highest_l +2) + [1]
-        graph_adjacency = np.array([latent_array]*self.highest_l + [empty_array] + [treatment_array] + [empty_array])
-        graph = nx.DiGraph(graph_adjacency)
+
+        graph_adjacency = [latent_array]*self.highest_l + [empty_array] + [treatment_array] + [empty_array]
+        graph = nx.DiGraph(np.array(graph_adjacency))
 
         weight_pred = self._get_grica_estimate(graph)
         return weight_pred[-1]
@@ -315,8 +316,8 @@ class ICM(CM):
         proxy_array = [0] * (self.highest_l + 1) + [1, 0]
         treatment_array = [0] * (self.highest_l +2) + [1]
         effect_array = [0] * (self.highest_l + 3)
-        graph_adjacency = np.array([latent_array]*self.highest_l + [proxy_array] + [treatment_array] + [effect_array])
-        graph = nx.DiGraph(graph_adjacency)
+        graph_adjacency = [latent_array]*self.highest_l + [proxy_array] + [treatment_array] + [effect_array]
+        graph = nx.DiGraph(np.array(graph_adjacency))
 
         weight_pred = self._get_grica_estimate(graph)
         return weight_pred[-1]
@@ -378,8 +379,12 @@ class IVModel(FixedGraphReLVLiNGAM):
         treatment_array = [0] * (2*self.highest_l + 1) + [0, 0, 1]
         effect_array = [0] * (2*self.highest_l + 4)
 
-        graph_adjacency = np.array([latent_array_1]*self.highest_l + [latent_array_2]*self.highest_l + [instrument_array] + [treatment_array]*2 + [effect_array])
-        graph = nx.DiGraph(graph_adjacency)
+        graph_adjacency = [latent_array_1]*self.highest_l + [latent_array_2]*self.highest_l
+        graph_adjacency += [instrument_array]
+        graph_adjacency += [treatment_array]*2
+        graph_adjacency +=[effect_array]
+
+        graph = nx.DiGraph(np.array(graph_adjacency))
 
         weight_pred = self._get_grica_estimate(graph = graph, latent = 2*self.highest_l)
         return weight_pred[-2:]
