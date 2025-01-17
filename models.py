@@ -5,9 +5,12 @@ from itertools import product as c_prod
 from functools import reduce
 from sympy import symbols
 import numpy as np
+import networkx as nx
+import torch
 import pyximport
 from direct_lingam.ReLVLiNGAM import ReLVLiNGAM, get_constraints_for_l_latents, MathError
 from utils import min_dist_perm, project, cross_moment
+from grica.methods import graphical_rica
 pyximport.install(inplace=True)
 
 
@@ -45,6 +48,7 @@ class FixedGraphReLVLiNGAM(ReLVLiNGAM):
         Returns:
         numpy.ndarray: The roots of the polynomial equations.
         """
+
         if highest_l is None:
             highest_l = self.highest_l
         if cumulants is None:
@@ -64,7 +68,7 @@ class FixedGraphReLVLiNGAM(ReLVLiNGAM):
         estimated_coeffs = [float(coeff.subs(specify_nodes).subs(symbols_to_cumulants)) for coeff in eq.all_coeffs()]
         if first_zero:
             estimated_coeffs[-1] = 0
-        return np.polynomial.Polynomial(estimated_coeffs[::-1]).roots().astype(np.float64)
+        return np.polynomial.Polynomial(estimated_coeffs[::-1]).roots().real.astype(np.float64)
 
     def _marginal__cumulants(self, candidate_effects, j=0, i=1):
         """
@@ -94,6 +98,41 @@ class FixedGraphReLVLiNGAM(ReLVLiNGAM):
         except np.linalg.LinAlgError as exc:
             raise MathError(f"Linear system for {k}th order omega for source {source} and test node {other_node} is singular.") from exc
         return marginal_omegas
+
+    def _get_grica_estimate(self, graph, latent = None):
+        """
+        Estimate the causal effect using the specified method.
+        """
+
+        lr = 0.1
+        w_init = 'cov_guess'
+        momentum = 0
+        epochs = 400
+        lambda_grica = 0
+        torch_data = torch.tensor(self.X, dtype=torch.float32)
+        d_cov = (torch_data.t()).cov()
+
+        # Whitening
+        _, s, v = d_cov.svd()
+        s_2=torch.inverse(torch.diag(s.sqrt()))
+        w_w = s_2.matmul(v.t())
+        data_whitened = w_w.matmul(torch_data.t()).t()
+        if latent is None:
+            latent = self.highest_l
+        observed = self.X.shape[1]
+        weight_pred= graphical_rica(latent,
+                                    observed,
+                                    graph,
+                                    torch_data,
+                                    data_whitened,
+                                    epochs,
+                                    lr,
+                                    w_w,
+                                    w_init,
+                                    momentum,
+                                    lambda_grica)
+
+        return weight_pred
 
 class CM(FixedGraphReLVLiNGAM):
     """
@@ -129,24 +168,33 @@ class CM(FixedGraphReLVLiNGAM):
     def estimate_effect(self):
         """
         Estimate the causal effect using the specified method.
-
-        Parameters:
-        method (str): The method to use for effect estimation. Can be "ratio" or "cumulant".
-
-        Raises:
-        ValueError: If the specified method is not supported.
         """
-
-
-        if self.highest_l < 2:
-            return cross_moment(self.X[:, 0], self.X[:, 1], self.X[:, 2])
-
         perm = min_dist_perm(self.cumulants_10[1:], self.cumulants_20[1:])
         roots_ratio = [0]
         roots_ratio += [self.roots_20[i + 1]/self.roots_10[perm[i] + 1] for i in range(self.roots_10.shape[0] - 1)]
         match_roots = min_dist_perm(np.array(roots_ratio), self.roots_21)
 
         return self.roots_21[match_roots[0]]
+
+    def estimate_effect_cross_moment(self):
+        """
+        Estimate the causal effect using the specified method.
+        """
+        return cross_moment(self.X[:, 0], self.X[:, 1], self.X[:, 2])
+
+    def estimate_effect_grica(self):
+        """
+        Estimate the causal effect using the specified method.
+        """
+        latent_array = [0] * self.highest_l + [1] * 3
+        empty_array = [0] * (self.highest_l + 3)
+        treatment_array = [0] * (self.highest_l +2) + [1]
+        graph_adjacency = np.array([latent_array]*self.highest_l + [empty_array] + [treatment_array] + [empty_array])
+        graph = nx.DiGraph(graph_adjacency)
+
+        weight_pred = self._get_grica_estimate(graph)
+        return weight_pred[-1]
+
 
 class ICM(CM):
     """
@@ -182,13 +230,41 @@ class ICM(CM):
         Raises:
         ValueError: If the specified method is not supported.
         """
-        if self.highest_l < 0:
+        if self.highest_l < 2:
             perm = min_dist_perm(self.cumulants_10, self.cumulants_20)
             roots_0 = [self.roots_10[0], self.roots_20[perm[0]]]
             roots_1 = [self.roots_10[1], self.roots_20[perm[1]]]
+            # return self._estimate__effect_cumulant_one_latent(roots_0, roots_1)
             return self._estimate__effect_cumulant_one_latent(roots_0, roots_1)
 
-        print("estmating effect")
+        # min_off = -np.inf
+        # best_effect = None
+        # offsets = {}
+
+        # for i in zip(self.roots_10, self.roots_20[perm]):
+        #     z, t, y = self.X[:,0], self.X[:,1], self.X[:,2]
+        #     t = t - i[0]*z
+        #     y = y - i[1]*z
+        #     cm_sample = np.vstack((z, t, y)).T
+        #     cm_model = CM(cm_sample, highest_l=self.highest_l)
+        #     cm_effect = cm_model.estimate_effect()
+        #     offset = np.abs(cm_effect * i[1] - i[0])
+        #     offsets[cm_effect] = offset
+        # return offsets
+        # min_off = -np.inf
+        # best_effect = None
+        # for i in zip(self.roots_10, self.roots_20[perm]):
+        #     z, t, y = self.X[:,0], self.X[:,1], self.X[:,2]
+        #     t = t - i[0]*z
+        #     y = y - i[1]*z
+        #     cm_sample = np.vstack((z, t, y)).T
+        #     cm_model = CM(cm_sample, highest_l=self.highest_l)
+        #     cm_effect = cm_model.estimate_effect()
+        #     offset = np.abs(cm_effect * i[1] - i[0])
+        #     if offset > min_off:
+        #         min_off = offset
+        #         best_effect = cm_effect
+
         perm = min_dist_perm(self.cumulants_10, self.cumulants_20)
         min_off = np.inf
         best_effect = None
@@ -203,6 +279,7 @@ class ICM(CM):
             if offset < min_off:
                 min_off = offset
                 best_effect = cm_effect
+
         return best_effect
 
     def _estimate__effect_cumulant_one_latent(self, roots_0, roots_1):
@@ -229,6 +306,20 @@ class ICM(CM):
         if np.argmin([diff_1, diff_2]) == 0:
             return b_1
         return b_2
+
+    def estimate_effect_grica(self):
+        """
+        Estimate the causal effect using the specified method.
+        """
+        latent_array = [0] * self.highest_l + [1] * 3
+        proxy_array = [0] * (self.highest_l + 1) + [1, 0]
+        treatment_array = [0] * (self.highest_l +2) + [1]
+        effect_array = [0] * (self.highest_l + 3)
+        graph_adjacency = np.array([latent_array]*self.highest_l + [proxy_array] + [treatment_array] + [effect_array])
+        graph = nx.DiGraph(graph_adjacency)
+
+        weight_pred = self._get_grica_estimate(graph)
+        return weight_pred[-1]
 
 class IVModel(FixedGraphReLVLiNGAM):
     """
@@ -273,7 +364,88 @@ class IVModel(FixedGraphReLVLiNGAM):
         """
         roots = list(c_prod(self.roots_1, self.roots_2))
         diffs = [np.abs(self.regs[1]*r[0] + self.regs[2]*r[1] - self.regs[3]) for r in roots]
-        causal_effect = roots[np.argmin(diffs)]
         causal_effect_projected = project(roots[np.argmin(diffs)], self.regs[1:-1], self.regs[-1])
         min_norm = project(np.zeros(2), self.regs[1:-1], self.regs[-1])
-        return causal_effect_projected, causal_effect, min_norm
+        return causal_effect_projected, min_norm
+
+    def estimate_effect_grica(self):
+        """
+        Estimate the causal effect using the specified method.
+        """
+        latent_array_1 = [0] * (2*self.highest_l+ 1) + [1, 0, 1]
+        latent_array_2 = [0] * (2*self.highest_l + 1) + [0, 1, 1]
+        instrument_array = [0] * (2*self.highest_l + 1) + [1, 1, 0]
+        treatment_array = [0] * (2*self.highest_l + 1) + [0, 0, 1]
+        effect_array = [0] * (2*self.highest_l + 4)
+
+        graph_adjacency = np.array([latent_array_1]*self.highest_l + [latent_array_2]*self.highest_l + [instrument_array] + [treatment_array]*2 + [effect_array])
+        graph = nx.DiGraph(graph_adjacency)
+
+        weight_pred = self._get_grica_estimate(graph = graph, latent = 2*self.highest_l)
+        return weight_pred[-2:]
+
+
+class IVModelNEW(FixedGraphReLVLiNGAM):
+    """
+    IVModel class.
+
+    Parameters:
+    *args: positional arguments
+
+    **kwargs: keyword arguments
+
+    """
+    def __init__(self,
+                 *args,
+                 instruments = None,
+                 treatments = None,
+                 outcome = None,
+                 **kwargs):
+        """
+            Initialize the DiDLiNGAM model.
+
+            Parameters:
+            *args: positional arguments
+            **kwargs: keyword arguments
+        """
+        super().__init__(*args, **kwargs)
+        cov_matrix = self.cumulants.get(2)
+        self.regs = np.invert(cov_matrix[instruments, instruments])*cov_matrix[instruments, :]
+
+        x_reg = self.X[:, [0, 1, 2, 3]] ##TO BE CHANGED
+        x_reg -= np.concatenate([self.X[:, instruments]*r for r in self.regs], axis=1)
+
+        self.red_cumulants = self._estimate_cumulants(np.asfortranarray(x_reg))
+        self.roots = [self._get_roots(i=outcome[0], j=treatment, cumulants = self.red_cumulants) for treatment in treatments]
+
+    def estimate_effect(self):
+        """
+        Estimate the causal effect using the specified method.
+
+        Parameters:
+        method (str): The method to use for effect estimation. Can be "ratio" or "cumulant".
+
+        Raises:
+        ValueError: If the specified method is not supported.
+        """
+        roots = list(c_prod(self.roots))
+        diffs = [np.abs(self.regs[1]*r[0] + self.regs[2]*r[1] - self.regs[3]) for r in roots]
+        causal_effect_projected = project(roots[np.argmin(diffs)], self.regs[1:-1], self.regs[-1])
+        min_norm = project(np.zeros(2), self.regs[1:-1], self.regs[-1])
+        return causal_effect_projected, min_norm
+
+    def estimate_effect_grica(self):
+        """
+        Estimate the causal effect using the specified method.
+        """
+        latent_array_1 = [0] * (2*self.highest_l+ 1) + [1, 0, 1]
+        latent_array_2 = [0] * (2*self.highest_l + 1) + [0, 1, 1]
+        instrument_array = [0] * (2*self.highest_l + 1) + [1, 1, 0]
+        treatment_array = [0] * (2*self.highest_l + 1) + [0, 0, 1]
+        effect_array = [0] * (2*self.highest_l + 4)
+
+        graph_adjacency = np.array([latent_array_1]*self.highest_l + [latent_array_2]*self.highest_l + [instrument_array] + [treatment_array]*2 + [effect_array])
+        graph = nx.DiGraph(graph_adjacency)
+
+        weight_pred = self._get_grica_estimate(graph = graph, latent = 2*self.highest_l)
+        return weight_pred[-2:]
