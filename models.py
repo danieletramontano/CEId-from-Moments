@@ -235,36 +235,7 @@ class ICM(CM):
             perm = min_dist_perm(self.cumulants_10, self.cumulants_20)
             roots_0 = [self.roots_10[0], self.roots_20[perm[0]]]
             roots_1 = [self.roots_10[1], self.roots_20[perm[1]]]
-            # return self._estimate__effect_cumulant_one_latent(roots_0, roots_1)
             return self._estimate__effect_cumulant_one_latent(roots_0, roots_1)
-
-        # min_off = -np.inf
-        # best_effect = None
-        # offsets = {}
-
-        # for i in zip(self.roots_10, self.roots_20[perm]):
-        #     z, t, y = self.X[:,0], self.X[:,1], self.X[:,2]
-        #     t = t - i[0]*z
-        #     y = y - i[1]*z
-        #     cm_sample = np.vstack((z, t, y)).T
-        #     cm_model = CM(cm_sample, highest_l=self.highest_l)
-        #     cm_effect = cm_model.estimate_effect()
-        #     offset = np.abs(cm_effect * i[1] - i[0])
-        #     offsets[cm_effect] = offset
-        # return offsets
-        # min_off = -np.inf
-        # best_effect = None
-        # for i in zip(self.roots_10, self.roots_20[perm]):
-        #     z, t, y = self.X[:,0], self.X[:,1], self.X[:,2]
-        #     t = t - i[0]*z
-        #     y = y - i[1]*z
-        #     cm_sample = np.vstack((z, t, y)).T
-        #     cm_model = CM(cm_sample, highest_l=self.highest_l)
-        #     cm_effect = cm_model.estimate_effect()
-        #     offset = np.abs(cm_effect * i[1] - i[0])
-        #     if offset > min_off:
-        #         min_off = offset
-        #         best_effect = cm_effect
 
         perm = min_dist_perm(self.cumulants_10, self.cumulants_20)
         min_off = np.inf
