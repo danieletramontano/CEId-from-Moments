@@ -11,6 +11,7 @@ import pyximport
 from direct_lingam.ReLVLiNGAM import ReLVLiNGAM, get_constraints_for_l_latents, MathError
 from utils import min_dist_perm, project, cross_moment
 from grica.methods import graphical_rica
+from scipy import optimize
 pyximport.install(inplace=True)
 
 
@@ -194,7 +195,7 @@ class CM(FixedGraphReLVLiNGAM):
         graph = nx.DiGraph(np.array(graph_adjacency))
 
         weight_pred = self._get_grica_estimate(graph)
-        return weight_pred[-1]
+        return weight_pred[-1].item()
 
 
 class ICM(CM):
@@ -219,6 +220,7 @@ class ICM(CM):
         """
 
         kwargs["first_zero"] = False
+        self.cumulant_estimate = None
         super().__init__(*args, **kwargs)
 
     def estimate_effect(self):
@@ -252,7 +254,8 @@ class ICM(CM):
                 min_off = offset
                 best_effect = cm_effect
 
-        return best_effect
+        self.cumulant_estimate = best_effect
+        return self.cumulant_estimate
 
     def _estimate__effect_cumulant_one_latent(self, roots_0, roots_1):
         """
@@ -269,15 +272,59 @@ class ICM(CM):
 
         cov_matrix = self.cumulants.get(2)
         # Estimate the causal effect
-        b_2 = ratio_formula(roots_0[0], cov_matrix)
-        b_1 = ratio_formula(roots_1[0], cov_matrix)
+        b_1 = ratio_formula(roots_0[0], cov_matrix)
+        b_0 = ratio_formula(roots_1[0], cov_matrix)
 
-        diff_1 = np.abs(roots_0[1] - b_1 * roots_0[0])
-        diff_2 = np.abs(roots_1[1] - b_2 * roots_1[0])
+        diffs = [np.abs(roots_0[1] - b_0 * roots_0[0]), np.abs(roots_1[1] - b_1 * roots_1[0])]
 
-        if np.argmin([diff_1, diff_2]) == 0:
-            return b_1
-        return b_2
+        if np.argmin(diffs) == 0:
+            self.cumulant_estimate = b_0
+            return self.cumulant_estimate
+        self.cumulant_estimate = b_1
+        return self.cumulant_estimate
+
+    def estimate__effect_minimization(self):
+        Z, T, Y = self.X[:, 0], self.X[:, 1], self.X[:, 2]
+        if self.cumulant_estimate is None:
+            self.estimate_effect()
+
+        init_point =  self.cumulant_estimate
+        alpha = 1
+
+        YYZ = (Y*Y*Z).mean()
+        YTZ = (Y*T*Z).mean()
+        TTZ = (T*T*Z).mean()
+        YTT = (Y*T*T).mean()
+        TTT = (T*T*T).mean()
+
+        a0 = YYZ * YTT
+        a1 = -TTT*YYZ - 2*YTZ*YTT
+        a2 = TTZ*YTT + 2*YTZ*TTT
+        a3 = -TTZ*TTT
+
+        YZZ = (Y*Z*Z).mean()
+        TZZ = (T*Z*Z).mean()
+        YYT = (Y*Y*T).mean()
+        YTT = (Y*T*T).mean()
+        TTT = (T*T*T).mean()
+
+        b0 = YZZ*YYT
+        b1 = -TZZ*YYT - 2*YTT*YZZ
+        b2 = YZZ*TTT + 2*YTT*TZZ
+        b3 = -TZZ*TTT
+
+        cov21 = (Y*T).mean()
+        cov20 = (Y*Z).mean()
+        cov11 = (T*T).mean()
+        cov10 = (T*Z).mean()
+
+        def f_min_reg(x):
+            k = (a0 + a1*x + a2*x*x + a3*x*x*x) / (b0 + b1*x + b2*x*x + b3*x*x*x)
+
+            return (x - (cov21 - k*cov20) / (cov11-k*cov10))**2 + alpha*(x - init_point)**2
+
+        sol = optimize.minimize(f_min_reg, init_point, method='BFGS')
+        return sol.x[0]
 
     def estimate_effect_grica(self):
         """
@@ -291,9 +338,9 @@ class ICM(CM):
         graph = nx.DiGraph(np.array(graph_adjacency))
 
         weight_pred = self._get_grica_estimate(graph)
-        return weight_pred[-1]
+        return weight_pred[-1].item()
 
-class IVModel(FixedGraphReLVLiNGAM):
+class IV(FixedGraphReLVLiNGAM):
     """
     IVModel class.
 
@@ -337,8 +384,14 @@ class IVModel(FixedGraphReLVLiNGAM):
         roots = list(c_prod(self.roots_1, self.roots_2))
         diffs = [np.abs(self.regs[1]*r[0] + self.regs[2]*r[1] - self.regs[3]) for r in roots]
         causal_effect_projected = project(roots[np.argmin(diffs)], self.regs[1:-1], self.regs[-1])
+        return causal_effect_projected
+
+    def estimate_effect_min_norm(self):
+        """
+        Estimate the causal effect using the specified method.
+        """
         min_norm = project(np.zeros(2), self.regs[1:-1], self.regs[-1])
-        return causal_effect_projected, min_norm
+        return min_norm
 
     def estimate_effect_grica(self):
         """
@@ -358,7 +411,7 @@ class IVModel(FixedGraphReLVLiNGAM):
         graph = nx.DiGraph(np.array(graph_adjacency))
 
         weight_pred = self._get_grica_estimate(graph = graph, latent = 2*self.highest_l)
-        return weight_pred[-2:]
+        return np.array(weight_pred[-2:])
 
 
 class IVModelNEW(FixedGraphReLVLiNGAM):

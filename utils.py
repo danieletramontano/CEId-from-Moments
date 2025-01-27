@@ -4,6 +4,14 @@ This module contains the utility functions.
 from itertools import permutations
 import numpy as np
 
+def reduce_list(l):
+    """
+    Return the element of the list if it has only one element.
+    """
+    if len(l) == 1:
+        return l[0]
+    return l
+
 def min_dist_perm(v1, v2):
     """
     Find the permutation of v2 that minimizes the L1 distance to v1.
