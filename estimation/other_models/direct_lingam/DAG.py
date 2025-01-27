@@ -36,7 +36,7 @@ def _adjacency_to_nx_graph(adjacency, tol=1e-10):
     extended_adjacency[np.abs(extended_adjacency) < tol] = 0
     # networkx uses transposed adjacency matrix compared to my setup
     G = nx.DiGraph(np.transpose(extended_adjacency))
-    return G 
+    return G
 
 def comon_latent_confounders(v, w, adjacency, p, tol=1e-10):
     if v > w:
@@ -59,9 +59,9 @@ def plot_dag(adjacency, tol=1e-10):
     p = adjacency.shape[0]
     q = adjacency.shape[1]
     G = _adjacency_to_nx_graph(adjacency, tol)
-    plt.figure(figsize=(4, 3)) 
+    plt.figure(figsize=(4, 3))
     colors = {**{observed_node: '#1f78b4' for observed_node in range(p)}, **{latent_node: 'gray' for latent_node in range(p, q)}}
-    nx.draw(G, with_labels=True, font_weight='bold', node_color=[colors[node] for node in G.nodes])
+    nx.draw_networkx(G, with_labels=True, font_weight='bold', node_color=[colors[node] for node in G.nodes])
     plt.show()
 
 def topological_order(path_matrix, tol=1e-10):
@@ -138,7 +138,7 @@ def precision(B_hat, True_B, tol_true=1e-10, tol_hat=1e-2):
 
 def recall(B_hat, True_B, tol_true=1e-10, tol_hat=1e-2):
     min_q = min(B_hat.shape[1], True_B.shape[1])
-    estimated_causal_paths = np.abs(B_hat) > tol_hat 
+    estimated_causal_paths = np.abs(B_hat) > tol_hat
     true_causal_paths = np.abs(True_B) > tol_true
     true_recovered_paths = np.sum(estimated_causal_paths[:,:min_q] & true_causal_paths[:,:min_q])
     nr_true_causal_paths = np.sum(true_causal_paths)
@@ -151,4 +151,4 @@ def RMSE(B_hat, True_B):
         B_hat = np.pad(B_hat, ((0, 0), (0, True_B.shape[1] - B_hat.shape[1])), 'constant', constant_values=0)
     elif True_B.shape[1] < B_hat.shape[1]:
         True_B = np.pad(True_B, ((0, 0), (0, B_hat.shape[1] - True_B.shape[1])), 'constant', constant_values=0)
-    return np.sqrt(mean_squared_error(B_hat, True_B)) 
+    return np.sqrt(mean_squared_error(B_hat, True_B))

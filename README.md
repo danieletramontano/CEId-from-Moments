@@ -25,7 +25,7 @@ To set up the environment and reproduce the experiments, follow these steps:
 
 ```bash
 cd Estimation
-conda env create -f requirements.yaml
+conda env create -f environment.yaml
 conda activate lvlingam
 conda install -c anaconda ipykernel
 python -m ipykernel install --user --name=lvlingam
