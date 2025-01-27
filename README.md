@@ -1,1 +1,0 @@
-# generilized_did
