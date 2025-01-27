@@ -31,5 +31,8 @@ conda install -c anaconda ipykernel
 python -m ipykernel install --user --name=lvlingam
 ```
 
-## License
-See LICENSE for more information.
+See `LICENSE` for more information.
+
+<!-- Authors -->
+## Authors
+Anonymous.
