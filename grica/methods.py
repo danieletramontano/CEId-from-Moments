@@ -6,9 +6,6 @@ import numpy as np
 import networkx as nx
 from torch.nn import Parameter
 
-
-
-
 def intersection(lst1, lst2):
     """
     Compute the intersection of two lists.
