@@ -71,7 +71,6 @@ def run_experiment(seed,
 
         seed_df[method + ' Estimate'] = estimates_dict[method]
 
-    print(f"Experiment with seed {seed} done\n")
     return seed_df
 
 def run_experiment_grica(seed,
@@ -120,7 +119,7 @@ def run_experiment_grica(seed,
         'GRICA Estimate': grica_causal_effect_estimate
     })
 
-    print(f"GRICA experiment with seed {seed} done\n")
+
     return seed_df
 
 def parallel_simulation(reps,
