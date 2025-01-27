@@ -1,0 +1,18 @@
+name: lvlingam
+channels:
+  - conda-forge
+dependencies:
+  - python == 3.11.09
+  - anaconda
+  - pip
+  - numpy == 1.23.5
+  - pandas == 2.2.3
+  - Cython==0.29.34
+  - matplotlib==3.7.0
+  - more_itertools==10.6.0
+  - multiprocess==0.70.15
+  - networkx==2.8.4
+  - scikit_learn==1.6.1
+  - scipy==1.15.1
+  - sympy==1.11.1
+  - torch==2.3.1
