@@ -9,9 +9,9 @@ import networkx as nx
 import torch
 import pyximport
 from scipy import optimize
-from .utils import min_dist_perm, project, cross_moment
 from other_models.direct_lingam.ReLVLiNGAM import ReLVLiNGAM, get_constraints_for_l_latents, MathError
 from other_models.grica.methods import graphical_rica
+from .utils import min_dist_perm, project, cross_moment
 pyximport.install(inplace=True)
 
 
@@ -71,7 +71,7 @@ class FixedGraphReLVLiNGAM(ReLVLiNGAM):
             estimated_coeffs[-1] = 0
         return np.polynomial.Polynomial(estimated_coeffs[::-1]).roots().real.astype(np.float64)
 
-    def _marginal__cumulants(self, candidate_effects, j=0, i=1):
+    def _marginal_cumulants(self, candidate_effects, j=0, i=1):
         """
         Estimate the marginal cumulants for the specified nodes.
 
@@ -163,8 +163,8 @@ class CM(FixedGraphReLVLiNGAM):
         self.roots_10 = np.array(sorted(self._get_roots(i=1, j=0, first_zero=first_zero), key = np.abs))
         self.roots_20 = np.array(sorted(self._get_roots(i=2, j=0, first_zero=first_zero), key = np.abs))
         self.roots_21 = np.array(sorted(self._get_roots(i=2, j=1), key = np.abs))
-        self.cumulants_10 = self._marginal__cumulants(self.roots_10, j=0, i=1)
-        self.cumulants_20 = self._marginal__cumulants(self.roots_20, j=0, i=2)
+        self.cumulants_10 = self._marginal_cumulants(self.roots_10, j=0, i=1)
+        self.cumulants_20 = self._marginal_cumulants(self.roots_20, j=0, i=2)
 
     def estimate_effect(self):
         """
@@ -283,7 +283,7 @@ class ICM(CM):
         self.cumulant_estimate = b_1
         return self.cumulant_estimate
 
-    def estimate__effect_minimization(self):
+    def estimate_effect_minimization(self):
         Z, T, Y = self.X[:, 0], self.X[:, 1], self.X[:, 2]
         if self.cumulant_estimate is None:
             self.estimate_effect()

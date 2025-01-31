@@ -17,7 +17,7 @@ paramoment = (n, k, edges, idpar,hidnodes) -> (
     	    for k from 0 to n-1 do (
 		use R;
 		if(i == j and i == k) then continue;
-		eqn = sum(apply(n, a -> sum(apply(n, b -> sum(apply(n, c -> L_(a,i)*L_(b,j)*L_(c,k)*t_(toSequence sort{a,b,c})))))));		
+		eqn = sum(apply(n, a -> sum(apply(n, b -> sum(apply(n, c -> L_(a,i)*L_(b,j)*L_(c,k)*t_(toSequence sort{a,b,c})))))));
 		equationList = append(equationList, eqn);
 		);
     	    );
@@ -30,15 +30,15 @@ paramoment = (n, k, edges, idpar,hidnodes) -> (
    elist3 = flatten flatten for i from 0 to hidnodes list for j from i to (n-1) list for k from j to (n-1) list (i,j,k);
 
    ll = append(ll,apply(elist2,i->s_i));
-   ll = append(ll,apply(elist3,i->t_i));   
-  
+   ll = append(ll,apply(elist3,i->t_i));
+
    ll = flatten ll;
-   for i from 0 to (#elist2-1) do  list2 = delete(elist2#i,list2);
-   for i from 0 to (#elist3-1) do  list3 = delete(elist3#i,list3);
-    
+   for i from 0 to (#elist2-1) do list2 = delete(elist2#i,list2);
+   for i from 0 to (#elist3-1) do list3 = delete(elist3#i,list3);
+
 
    J = eliminate(ll, I);
-   R1=QQ[lpar, apply(list2,i->s_i),apply(list3,i->t_i),MonomialOrder=> Lex];
+   R1=QQ[lpar, apply(list2,i->s_i),apply(list3,i->t_i), MonomialOrder=> Lex];
    J=substitute(J,R1);
    return(J);
 );
