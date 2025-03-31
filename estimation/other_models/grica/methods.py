@@ -79,6 +79,7 @@ def graphical_rica(latent, observed, g, data, data_whitening, epochs, lr, W_w, w
         Returns:
             - weight_pred (torch.Tensor): The learned weights.
         """
+    # Set random seeds for reproducibility
 
     loss_data = torch.zeros(epochs)
 
@@ -129,4 +130,4 @@ def graphical_rica(latent, observed, g, data, data_whitening, epochs, lr, W_w, w
         loss.backward()
         optimizer.step()
 
-    return weight_pred
+    return weight_pred, min_loss

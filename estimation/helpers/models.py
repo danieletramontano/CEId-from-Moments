@@ -121,7 +121,7 @@ class FixedGraphReLVLiNGAM(ReLVLiNGAM):
         if latent is None:
             latent = self.highest_l
         observed = self.X.shape[1]
-        weight_pred= graphical_rica(latent,
+        weight_pred, min_loss= graphical_rica(latent,
                                     observed,
                                     graph,
                                     torch_data,
@@ -133,7 +133,7 @@ class FixedGraphReLVLiNGAM(ReLVLiNGAM):
                                     momentum,
                                     lambda_grica)
 
-        return weight_pred
+        return weight_pred, min_loss
 
 class CM(FixedGraphReLVLiNGAM):
     """
@@ -177,11 +177,11 @@ class CM(FixedGraphReLVLiNGAM):
 
         return self.roots_21[match_roots[0]]
 
-    def estimate_effect_cross_moment(self):
+    def estimate_effect_cross_moment(self, deg = 2):
         """
         Estimate the causal effect using the specified method.
         """
-        return cross_moment(self.X[:, 0], self.X[:, 1], self.X[:, 2])
+        return cross_moment(self.X[:, 0], self.X[:, 1], self.X[:, 2], deg = deg)
 
     def estimate_effect_grica(self):
         """
@@ -194,7 +194,13 @@ class CM(FixedGraphReLVLiNGAM):
         graph_adjacency = [latent_array]*self.highest_l + [empty_array] + [treatment_array] + [empty_array]
         graph = nx.DiGraph(np.array(graph_adjacency))
 
-        weight_pred = self._get_grica_estimate(graph)
+        weight_pred, min_loss = self._get_grica_estimate(graph)
+        for _ in range(20):
+            weight_pred_new, min_loss_new = self._get_grica_estimate(graph)
+            if min_loss_new < min_loss:
+                weight_pred = weight_pred_new
+                min_loss = min_loss_new
+
         return weight_pred[-1].item()
 
 
@@ -337,7 +343,13 @@ class ICM(CM):
         graph_adjacency = [latent_array]*self.highest_l + [proxy_array] + [treatment_array] + [effect_array]
         graph = nx.DiGraph(np.array(graph_adjacency))
 
-        weight_pred = self._get_grica_estimate(graph)
+        weight_pred, min_loss = self._get_grica_estimate(graph)
+        for _ in range(20):
+            weight_pred_new, min_loss_new = self._get_grica_estimate(graph)
+            if min_loss_new < min_loss:
+                weight_pred = weight_pred_new
+                min_loss = min_loss_new
+
         return weight_pred[-1].item()
 
 class IV(FixedGraphReLVLiNGAM):
@@ -410,7 +422,13 @@ class IV(FixedGraphReLVLiNGAM):
 
         graph = nx.DiGraph(np.array(graph_adjacency))
 
-        weight_pred = self._get_grica_estimate(graph = graph, latent = 2*self.highest_l)
+        weight_pred, min_loss = self._get_grica_estimate(graph, latent = 2*self.highest_l)
+        for _ in range(20):
+            weight_pred_new, min_loss_new = self._get_grica_estimate(graph, latent = 2*self.highest_l)
+            if min_loss_new < min_loss:
+                weight_pred = weight_pred_new
+                min_loss = min_loss_new
+
         return np.array(weight_pred[-2:])
 
 
@@ -476,5 +494,10 @@ class IVModelNEW(FixedGraphReLVLiNGAM):
         graph_adjacency = np.array([latent_array_1]*self.highest_l + [latent_array_2]*self.highest_l + [instrument_array] + [treatment_array]*2 + [effect_array])
         graph = nx.DiGraph(graph_adjacency)
 
-        weight_pred = self._get_grica_estimate(graph = graph, latent = 2*self.highest_l)
+        weight_pred, min_loss = self._get_grica_estimate(graph, latent = 2*self.highest_l)
+        for _ in range(20):
+            weight_pred_new, min_loss_new = self._get_grica_estimate(graph, latent = 2*self.highest_l)
+            if min_loss_new < min_loss:
+                weight_pred = weight_pred_new
+                min_loss = min_loss_new
         return weight_pred[-2:]
