@@ -1,6 +1,6 @@
 # Causal Effect Identification in lvLiNGAM from High-Order Cumulants
 
-This repository contains the code to reproduce the experiments in the paper *[Causal Effect Identification in lvLiNGAM from High-Order Cumulants]([http://example.com](https://arxiv.org/pdf/2506.05202))*
+This repository contains the code to reproduce the experiments in the paper *[Causal Effect Identification in lvLiNGAM from High-Order Cumulants](https://arxiv.org/pdf/2506.05202), ICML 2025.*
 
 ## Directory Structure
 
